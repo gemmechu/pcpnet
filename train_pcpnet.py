@@ -70,7 +70,8 @@ def parse_arguments():
 
 def train_pcpnet(opt):
 
-    device = torch.device("cpu" if opt.gpu_idx < 0 else "cuda:%d" % opt.gpu_idx)
+    # device = torch.device("cpu" if opt.gpu_idx < 0 else "cuda:%d" % opt.gpu_idx)
+    device = torch.device("cpu" )
 
     # colored console output
     green = lambda x: '\033[92m' + x + '\033[0m'
