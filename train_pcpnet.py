@@ -20,7 +20,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
 
     # naming / file handling
-    parser.add_argument('--name', type=str, default='my_single_scale_normal', help='training run name')
+    parser.add_argument('--name', type=str, default='my_single_scale_normal 2', help='training run name')
     parser.add_argument('--desc', type=str, default='My training run for single-scale normal estimation.', help='description')
     parser.add_argument('--indir', type=str, default='./data/noisy_clouds', help='input folder (point clouds)')
     parser.add_argument('--outdir', type=str, default='./models', help='output folder (trained models)')
@@ -55,7 +55,7 @@ def parse_arguments():
                         'ms_oneminuscos: mean square 1-cos(angle error)')
 
     # model hyperparameters
-    parser.add_argument('--outputs', type=str, nargs='+', default=['unoriented_normals'], help='outputs of the network, a list with elements of:\n'
+    parser.add_argument('--outputs', type=str, nargs='+', default=['laplacian'], help='outputs of the network, a list with elements of:\n'
                         'unoriented_normals: unoriented (flip-invariant) point normals\n'
                         'oriented_normals: oriented point normals\n'
                         'max_curvature: maximum curvature\n'
@@ -97,7 +97,15 @@ def train_pcpnet(opt):
     output_loss_weight = []
     pred_dim = 0
     for o in opt.outputs:
-        if o == 'unoriented_normals' or o == 'oriented_normals':
+        if o == 'laplacian':
+            if 'laplacian' not in target_features:
+                target_features.append('laplacian')
+
+            output_target_ind.append(target_features.index('laplacian'))
+            output_pred_ind.append(pred_dim)
+            output_loss_weight.append(1.0)
+            pred_dim += 2
+        elif o == 'unoriented_normals' or o == 'oriented_normals':
             if 'normal' not in target_features:
                 target_features.append('normal')
 
@@ -353,6 +361,26 @@ def compute_loss(pred, target, outputs, output_pred_ind, output_target_ind, outp
     loss = 0
 
     for oi, o in enumerate(outputs):
+        if o == "laplacian":
+            o_pred = pred[:, output_pred_ind[oi]:output_pred_ind[oi]+3]
+            o_target = target[output_target_ind[oi]]
+
+            if patch_rot is not None:
+                # transform predictions with inverse transform
+                # since we know the transform to be a rotation (QSTN), the transpose is the inverse
+                o_pred = torch.bmm(o_pred.unsqueeze(1), patch_rot.transpose(2, 1)).squeeze(1)
+
+            if o == 'laplacian':
+                if normal_loss == 'ms_euclidean':
+                    loss += torch.min((o_pred-o_target).pow(2).sum(1), (o_pred+o_target).pow(2).sum(1)).mean() * output_loss_weight[oi]
+                elif normal_loss == 'ms_oneminuscos':
+                    loss += (1-torch.abs(utils.cos_angle(o_pred, o_target))).pow(2).mean() * output_loss_weight[oi]
+                else:
+                    raise ValueError('Unsupported loss type: %s' % (normal_loss))
+
+            else:
+                raise ValueError('Unsupported output type: %s' % (o))
+
         if o == 'unoriented_normals' or o == 'oriented_normals':
             o_pred = pred[:, output_pred_ind[oi]:output_pred_ind[oi]+3]
             o_target = target[output_target_ind[oi]]
