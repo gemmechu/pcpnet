@@ -10,4 +10,4 @@
 /models/*.txt
 /__pycache__/
 /logs/
-/noisy_clouds/
+/data/
