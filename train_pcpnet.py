@@ -104,7 +104,7 @@ def train_pcpnet(opt):
             output_target_ind.append(target_features.index('laplacian'))
             output_pred_ind.append(pred_dim)
             output_loss_weight.append(1.0)
-            pred_dim += 2
+            pred_dim += 3
         elif o == 'unoriented_normals' or o == 'oriented_normals':
             if 'normal' not in target_features:
                 target_features.append('normal')
