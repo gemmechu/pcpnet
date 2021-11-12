@@ -22,11 +22,11 @@ def parse_arguments():
     # naming / file handling
     parser.add_argument('--name', type=str, default='my_single_scale_normal', help='training run name')
     parser.add_argument('--desc', type=str, default='My training run for single-scale normal estimation.', help='description')
-    parser.add_argument('--indir', type=str, default='./pclouds', help='input folder (point clouds)')
+    parser.add_argument('--indir', type=str, default='./data', help='input folder (point clouds)')
     parser.add_argument('--outdir', type=str, default='./models', help='output folder (trained models)')
     parser.add_argument('--logdir', type=str, default='./logs', help='training log folder')
-    parser.add_argument('--trainset', type=str, default='trainingset_whitenoise.txt', help='training set file name')
-    parser.add_argument('--testset', type=str, default='validationset_whitenoise.txt', help='test set file name')
+    parser.add_argument('--trainset', type=str, default='trainingset.txt', help='training set file name')
+    parser.add_argument('--testset', type=str, default='testset.txt', help='test set file name')
     parser.add_argument('--saveinterval', type=int, default='10', help='save model each n epochs')
     parser.add_argument('--refine', type=str, default='', help='refine model at this path')
     parser.add_argument('--gpu_idx', type=int, default=0, help='set < 0 to use CPU')
@@ -55,7 +55,7 @@ def parse_arguments():
                         'ms_oneminuscos: mean square 1-cos(angle error)')
 
     # model hyperparameters
-    parser.add_argument('--outputs', type=str, nargs='+', default=['unoriented_normals'], help='outputs of the network, a list with elements of:\n'
+    parser.add_argument('--outputs', type=str, nargs='+', default=['laplacian'], help='outputs of the network, a list with elements of:\n'
                         'unoriented_normals: unoriented (flip-invariant) point normals\n'
                         'oriented_normals: oriented point normals\n'
                         'max_curvature: maximum curvature\n'
@@ -104,6 +104,14 @@ def train_pcpnet(opt):
             output_pred_ind.append(pred_dim)
             output_loss_weight.append(1.0)
             pred_dim += 3
+        elif o == 'laplacian':
+            if 'laplacian' not in target_features:
+                target_features.append('laplacian')
+
+            output_target_ind.append(target_features.index('laplacian'))
+            output_pred_ind.append(pred_dim)
+            output_loss_weight.append(1.0)
+            pred_dim += 5
         elif o == 'max_curvature' or o == 'min_curvature':
             if o not in target_features:
                 target_features.append(o)
@@ -270,18 +278,18 @@ def train_pcpnet(opt):
             # get trainingset batch and upload to GPU
             points = data[0]
             target = data[1:-1]
-
             points = points.transpose(2, 1)
             points = points.to(device)
 
-            target = tuple(t.to(device) for t in target)
+            target = torch.stack([t.to(device) for t in target])
+            
 
             # zero gradients
             optimizer.zero_grad()
 
             # forward pass
             pred, trans, _, _ = pcpnet(points)
-
+            
             loss = compute_loss(
                 pred=pred, target=target,
                 outputs=opt.outputs,
@@ -313,11 +321,11 @@ def train_pcpnet(opt):
                 # get testset batch and upload to GPU
                 points = data[0]
                 target = data[1:-1]
-
                 points = points.transpose(2, 1)
                 points = points.to(device)
 
-                target = tuple(t.to(device) for t in target)
+                target = torch.stack([t.to(device) for t in target])
+                
 
                 # forward pass
                 with torch.no_grad():
@@ -350,9 +358,13 @@ def train_pcpnet(opt):
 def compute_loss(pred, target, outputs, output_pred_ind, output_target_ind, output_loss_weight, patch_rot, normal_loss):
 
     loss = 0
-
+    loss_MSE = torch.nn.MSELoss()
     for oi, o in enumerate(outputs):
-        if o == 'unoriented_normals' or o == 'oriented_normals':
+        if o == 'laplacian':
+            o_pred = pred[:, output_pred_ind[oi]:output_pred_ind[oi]+5]
+            o_target = target[output_target_ind[oi]]
+            loss += loss_MSE(pred,target)
+        elif o == 'unoriented_normals' or o == 'oriented_normals':
             o_pred = pred[:, output_pred_ind[oi]:output_pred_ind[oi]+3]
             o_target = target[output_target_ind[oi]]
 

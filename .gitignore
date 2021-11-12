@@ -10,3 +10,5 @@
 /models/*.txt
 /__pycache__/
 /logs/
+/data/
+/output/
