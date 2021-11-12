@@ -10,17 +10,14 @@ import scipy.spatial as spatial
 
 # do NOT modify the returned points! kdtree uses a reference, not a copy of these points,
 # so modifying the points would make the kdtree give incorrect results
-def load_shape(point_filename, normals_filename, laplacian_filename, curv_filename, pidx_filename):
+def load_shape(point_filename, normals_filename, curv_filename, pidx_filename):
     pts = np.load(point_filename+'.npy')
 
     if normals_filename != None:
         normals = np.load(normals_filename+'.npy')
     else:
         normals = None
-    if laplacian_filename != None:
-        laplacian = np.load(laplacian_filename+'.npy')
-    else:
-        laplacian = None
+
     if curv_filename != None:
         curvatures = np.load(curv_filename+'.npy')
     else:
@@ -34,7 +31,7 @@ def load_shape(point_filename, normals_filename, laplacian_filename, curv_filena
     sys.setrecursionlimit(int(max(1000, round(pts.shape[0]/10)))) # otherwise KDTree construction may run out of recursions
     kdtree = spatial.cKDTree(pts, 10)
 
-    return Shape(pts=pts, kdtree=kdtree, normals=normals,laplacian= laplacian, curv=curvatures, pidx=patch_indices)
+    return Shape(pts=pts, kdtree=kdtree, normals=normals, curv=curvatures, pidx=patch_indices)
 
 class SequentialPointcloudPatchSampler(data.sampler.Sampler):
 
@@ -137,14 +134,12 @@ class RandomPointcloudPatchSampler(data.sampler.Sampler):
 
 
 class Shape():
-    def __init__(self, pts, kdtree, normals=None, laplacian=None, curv=None, pidx=None):
+    def __init__(self, pts, kdtree, normals=None, curv=None, pidx=None):
         self.pts = pts
         self.kdtree = kdtree
         self.normals = normals
-        self.laplacian = laplacian
         self.curv = curv
-        self.pidx = pidx 
-        self.laplacian = laplacian# patch center points indices (None means all points are potential patch centers)
+        self.pidx = pidx # patch center points indices (None means all points are potential patch centers)
 
 
 class Cache():
@@ -194,15 +189,12 @@ class PointcloudPatchDataset(data.Dataset):
         self.point_tuple = point_tuple
         self.point_count_std = point_count_std
         self.seed = seed
-        self.include_laplacian = False
+
         self.include_normals = False
-        self.include_laplacian = False
         self.include_curvatures = False
         for pfeat in self.patch_features:
             if pfeat == 'normal':
                 self.include_normals = True
-            elif pfeat == 'laplacian':
-                self.include_laplacian = True
             elif pfeat == 'max_curvature' or pfeat == 'min_curvature':
                 self.include_curvatures = True
             else:
@@ -231,7 +223,7 @@ class PointcloudPatchDataset(data.Dataset):
             print('getting information for shape %s' % (shape_name))
 
             # load from text file and save in more efficient numpy format
-            point_filename = os.path.join(self.root,'xyz', shape_name+'.xyz')
+            point_filename = os.path.join(self.root, shape_name+'.xyz')
             pts = np.loadtxt(point_filename).astype('float32')
             np.save(point_filename+'.npy', pts)
 
@@ -241,12 +233,6 @@ class PointcloudPatchDataset(data.Dataset):
                 np.save(normals_filename+'.npy', normals)
             else:
                 normals_filename = None
-            if self.include_laplacian:
-                lapl_filename = os.path.join(self.root,'laplacian', shape_name+'.laplacian')
-                laplacians = np.loadtxt(lapl_filename).astype('float32')
-                np.save(lapl_filename+'.npy', laplacians)
-            else:
-                laplacians = None
 
             if self.include_curvatures:
                 curv_filename = os.path.join(self.root, shape_name+'.curv')
@@ -333,15 +319,13 @@ class PointcloudPatchDataset(data.Dataset):
 
         if self.include_normals:
             patch_normal = torch.from_numpy(shape.normals[center_point_ind, :])
-        if self.include_laplacian:
-            patch_laplacian = torch.from_numpy(shape.laplacian[center_point_ind, :])
 
         if self.include_curvatures:
             patch_curv = torch.from_numpy(shape.curv[center_point_ind, :])
             # scale curvature to match the scaled vertices (curvature*s matches position/s):
             patch_curv = patch_curv * self.patch_radius_absolute[shape_ind][0]
 
-        if self.use_pca: #not used
+        if self.use_pca:
 
             # compute pca of points in the patch:
             # center the patch around the mean:
@@ -365,7 +349,7 @@ class PointcloudPatchDataset(data.Dataset):
 
 
         # get point tuples from the current patch
-        if self.point_tuple > 1: #not used
+        if self.point_tuple > 1:
             patch_tuples = torch.zeros(self.points_per_patch*len(self.patch_radius_absolute[shape_ind]), 3*self.point_tuple, dtype=torch.float)
             for s, rad in enumerate(self.patch_radius_absolute[shape_ind]):
                 start = scale_ind_range[s, 0]
@@ -394,10 +378,7 @@ class PointcloudPatchDataset(data.Dataset):
         for pfeat in self.patch_features:
             if pfeat == 'normal':
                 patch_feats = patch_feats + (patch_normal,)
-            elif pfeat == 'laplacian':
-                patch_feats = patch_feats + (patch_laplacian,)
             elif pfeat == 'max_curvature':
-            
                 patch_feats = patch_feats + (patch_curv[0:1],)
             elif pfeat == 'min_curvature':
                 patch_feats = patch_feats + (patch_curv[1:2],)
@@ -425,9 +406,8 @@ class PointcloudPatchDataset(data.Dataset):
 
     # load shape from a given shape index
     def load_shape_by_index(self, shape_ind):
-        point_filename = os.path.join(self.root,'xyz', self.shape_names[shape_ind]+'.xyz')
+        point_filename = os.path.join(self.root, self.shape_names[shape_ind]+'.xyz')
         normals_filename = os.path.join(self.root, self.shape_names[shape_ind]+'.normals') if self.include_normals else None
-        laplacian_filename = os.path.join(self.root, 'laplacian',self.shape_names[shape_ind]+'.laplacian') if self.include_laplacian else None
         curv_filename = os.path.join(self.root, self.shape_names[shape_ind]+'.curv') if self.include_curvatures else None
         pidx_filename = os.path.join(self.root, self.shape_names[shape_ind]+'.pidx') if self.sparse_patches else None
-        return load_shape(point_filename, normals_filename, laplacian_filename ,curv_filename, pidx_filename)
+        return load_shape(point_filename, normals_filename, curv_filename, pidx_filename)
