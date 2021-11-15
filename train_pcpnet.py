@@ -20,7 +20,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
 
     # naming / file handling
-    parser.add_argument('--name', type=str, default='my_single_scale_normal 2', help='training run name')
+    parser.add_argument('--name', type=str, default='my_single_scale_normal', help='training run name')
     parser.add_argument('--desc', type=str, default='My training run for single-scale normal estimation.', help='description')
     parser.add_argument('--indir', type=str, default='./data', help='input folder (point clouds)')
     parser.add_argument('--outdir', type=str, default='./models', help='output folder (trained models)')
@@ -32,7 +32,7 @@ def parse_arguments():
     parser.add_argument('--gpu_idx', type=int, default=0, help='set < 0 to use CPU')
 
     # training parameters
-    parser.add_argument('--nepoch', type=int, default=1, help='number of epochs to train for')
+    parser.add_argument('--nepoch', type=int, default=2000, help='number of epochs to train for')
     parser.add_argument('--batchSize', type=int, default=64, help='input batch size')
     parser.add_argument('--patch_radius', type=float, default=[0.05], nargs='+', help='patch radius in multiples of the shape\'s bounding box diagonal, multiple values for multi-scale.')
     parser.add_argument('--patch_center', type=str, default='point', help='center patch at...\n'
@@ -70,8 +70,7 @@ def parse_arguments():
 
 def train_pcpnet(opt):
 
-    # device = torch.device("cpu" if opt.gpu_idx < 0 else "cuda:%d" % opt.gpu_idx)
-    device = torch.device("cpu" )
+    device = torch.device("cpu" if opt.gpu_idx < 0 else "cuda:%d" % opt.gpu_idx)
 
     # colored console output
     green = lambda x: '\033[92m' + x + '\033[0m'
@@ -97,15 +96,7 @@ def train_pcpnet(opt):
     output_loss_weight = []
     pred_dim = 0
     for o in opt.outputs:
-        if o == 'laplacian':
-            if 'laplacian' not in target_features:
-                target_features.append('laplacian')
-
-            output_target_ind.append(target_features.index('laplacian'))
-            output_pred_ind.append(pred_dim)
-            output_loss_weight.append(1.0)
-            pred_dim += 3
-        elif o == 'unoriented_normals' or o == 'oriented_normals':
+        if o == 'unoriented_normals' or o == 'oriented_normals':
             if 'normal' not in target_features:
                 target_features.append('normal')
 
