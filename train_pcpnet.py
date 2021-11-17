@@ -20,7 +20,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
 
     # naming / file handling
-    parser.add_argument('--name', type=str, default='my_single_scale_normal', help='training run name')
+    parser.add_argument('--name', type=str, default='temp', help='training run name')
     parser.add_argument('--desc', type=str, default='My training run for single-scale normal estimation.', help='description')
     parser.add_argument('--indir', type=str, default='./data', help='input folder (point clouds)')
     parser.add_argument('--outdir', type=str, default='./models', help='output folder (trained models)')
@@ -29,10 +29,10 @@ def parse_arguments():
     parser.add_argument('--testset', type=str, default='testset.txt', help='test set file name')
     parser.add_argument('--saveinterval', type=int, default='10', help='save model each n epochs')
     parser.add_argument('--refine', type=str, default='', help='refine model at this path')
-    parser.add_argument('--gpu_idx', type=int, default=0, help='set < 0 to use CPU')
+    parser.add_argument('--gpu_idx', type=int, default=1, help='set < 0 to use CPU')
 
     # training parameters
-    parser.add_argument('--nepoch', type=int, default=2000, help='number of epochs to train for')
+    parser.add_argument('--nepoch', type=int, default=500, help='number of epochs to train for')
     parser.add_argument('--batchSize', type=int, default=64, help='input batch size')
     parser.add_argument('--patch_radius', type=float, default=[0.05], nargs='+', help='patch radius in multiples of the shape\'s bounding box diagonal, multiple values for multi-scale.')
     parser.add_argument('--patch_center', type=str, default='point', help='center patch at...\n'
@@ -111,7 +111,7 @@ def train_pcpnet(opt):
             output_target_ind.append(target_features.index('laplacian'))
             output_pred_ind.append(pred_dim)
             output_loss_weight.append(1.0)
-            pred_dim += 5
+            pred_dim += 6
         elif o == 'max_curvature' or o == 'min_curvature':
             if o not in target_features:
                 target_features.append(o)

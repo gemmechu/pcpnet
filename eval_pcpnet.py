@@ -15,14 +15,14 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
 
     # naming / file handling
-    parser.add_argument('--indir', type=str, default='./pclouds', help='input folder (point clouds)')
+    parser.add_argument('--indir', type=str, default='./data', help='input folder (point clouds)')
     parser.add_argument('--outdir', type=str, default='./results', help='output folder (estimated point cloud properties)')
-    parser.add_argument('--dataset', type=str, default='testset_no_noise.txt', help='shape set file name')
+    parser.add_argument('--dataset', type=str, default='eval.txt', help='shape set file name')
     parser.add_argument('--modeldir', type=str, default='./models', help='model folder')
-    parser.add_argument('--models', type=str, default='single_scale_normal', help='names of trained models, can evaluate multiple models')
+    parser.add_argument('--models', type=str, default='laplacian_denoise_model', help='names of trained models, can evaluate multiple models')
     parser.add_argument('--modelpostfix', type=str, default='_model.pth', help='model file postfix')
     parser.add_argument('--parmpostfix', type=str, default='_params.pth', help='parameter file postfix')
-    parser.add_argument('--gpu_idx', type=int, default=0, help='set < 0 to use CPU')
+    parser.add_argument('--gpu_idx', type=int, default=2, help='set < 0 to use CPU')
 
     parser.add_argument('--sparse_patches', type=int, default=False, help='evaluate on a sparse set of patches, given by a .pidx file containing the patch center point indices.')
     parser.add_argument('--sampling', type=str, default='full', help='sampling strategy, any of:\n'
@@ -69,6 +69,9 @@ def eval_pcpnet(opt):
             if o == 'unoriented_normals' or o == 'oriented_normals':
                 output_pred_ind.append(pred_dim)
                 pred_dim += 3
+            elif o == 'laplacian':
+                output_pred_ind.append(pred_dim)
+                pred_dim += 6
             elif o == 'max_curvature' or o == 'min_curvature':
                 output_pred_ind.append(pred_dim)
                 pred_dim += 1
@@ -171,6 +174,22 @@ def eval_pcpnet(opt):
                     # normalize normals
                     o_pred_len = torch.max(o_pred.new_tensor([sys.float_info.epsilon*100]), o_pred.norm(p=2, dim=1, keepdim=True))
                     o_pred = o_pred / o_pred_len
+                
+                elif o == 'laplacian':
+                    o_pred = pred[:, output_pred_ind[oi]:output_pred_ind[oi]+6]
+
+                    if trainopt.use_point_stn:
+                        # transform predictions with inverse transform
+                        # since we know the transform to be a rotation (QSTN), the transpose is the inverse
+                        o_pred[:, :] = torch.bmm(o_pred.unsqueeze(1), trans.transpose(2, 1)).squeeze(dim=1)
+
+                    if trainopt.use_pca:
+                        # transform predictions with inverse pca rotation (back to world space)
+                        o_pred[:, :] = torch.bmm(o_pred.unsqueeze(1), data_trans.transpose(2, 1)).squeeze(dim=1)
+
+                    # normalize normals
+                    o_pred_len = torch.max(o_pred.new_tensor([sys.float_info.epsilon*100]), o_pred.norm(p=2, dim=1, keepdim=True))
+                    o_pred = o_pred / o_pred_len
 
                 elif o == 'max_curvature' or o == 'min_curvature':
                     o_pred = pred[:, output_pred_ind[oi]:output_pred_ind[oi]+1]
@@ -202,12 +221,12 @@ def eval_pcpnet(opt):
                     prop_saved = [False]*len(trainopt.outputs)
 
                     # save normals
-                    oi = [i for i, o in enumerate(trainopt.outputs) if o in ['unoriented_normals', 'oriented_normals']]
+                    oi = [i for i, o in enumerate(trainopt.outputs) if o in ['unoriented_normals', 'oriented_normals', 'laplacian']]
                     if len(oi) > 1:
                         raise ValueError('Duplicate normal output.')
                     elif len(oi) == 1:
                         oi = oi[0]
-                        normal_prop = shape_properties[:, output_pred_ind[oi]:output_pred_ind[oi]+3]
+                        normal_prop = shape_properties[:, output_pred_ind[oi]:output_pred_ind[oi]+6]
                         np.savetxt(os.path.join(model_outdir, dataset.shape_names[shape_ind]+'.normals'), normal_prop.cpu().numpy())
                         prop_saved[oi] = True
 
@@ -252,3 +271,4 @@ def eval_pcpnet(opt):
 if __name__ == '__main__':
     eval_opt = parse_arguments()
     eval_pcpnet(eval_opt)
+

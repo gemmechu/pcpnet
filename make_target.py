@@ -102,6 +102,6 @@ def create_target():
     
         dest_name = 'data/laplacian/' +file.split('/')[-1].split('.')[0] +'.laplacian'
         save_xyz(result, dest_name)
-        break
+        
 
 create_target()
