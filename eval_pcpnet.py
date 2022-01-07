@@ -17,12 +17,12 @@ def parse_arguments():
     # naming / file handling
     parser.add_argument('--indir', type=str, default='./data', help='input folder (point clouds)')
     parser.add_argument('--outdir', type=str, default='./results', help='output folder (estimated point cloud properties)')
-    parser.add_argument('--dataset', type=str, default='eval.txt', help='shape set file name')
+    parser.add_argument('--dataset', type=str, default='testset_internet.txt', help='shape set file name')
     parser.add_argument('--modeldir', type=str, default='./models', help='model folder')
     parser.add_argument('--models', type=str, default='laplacian_denoise_model', help='names of trained models, can evaluate multiple models')
     parser.add_argument('--modelpostfix', type=str, default='_model.pth', help='model file postfix')
     parser.add_argument('--parmpostfix', type=str, default='_params.pth', help='parameter file postfix')
-    parser.add_argument('--gpu_idx', type=int, default=2, help='set < 0 to use CPU')
+    parser.add_argument('--gpu_idx', type=int, default=-2, help='set < 0 to use CPU')
 
     parser.add_argument('--sparse_patches', type=int, default=False, help='evaluate on a sparse set of patches, given by a .pidx file containing the patch center point indices.')
     parser.add_argument('--sampling', type=str, default='full', help='sampling strategy, any of:\n'
@@ -124,7 +124,7 @@ def eval_pcpnet(opt):
                 sym_op=trainopt.sym_op,
                 point_tuple=trainopt.point_tuple)
 
-        regressor.load_state_dict(torch.load(model_filename))
+        regressor.load_state_dict(torch.load(model_filename, map_location=torch.device('cpu')))
         regressor.to(device)
         regressor.eval()
 
@@ -178,18 +178,18 @@ def eval_pcpnet(opt):
                 elif o == 'laplacian':
                     o_pred = pred[:, output_pred_ind[oi]:output_pred_ind[oi]+6]
 
-                    if trainopt.use_point_stn:
-                        # transform predictions with inverse transform
-                        # since we know the transform to be a rotation (QSTN), the transpose is the inverse
-                        o_pred[:, :] = torch.bmm(o_pred.unsqueeze(1), trans.transpose(2, 1)).squeeze(dim=1)
+                    # if trainopt.use_point_stn:
+                    #     # transform predictions with inverse transform
+                    #     # since we know the transform to be a rotation (QSTN), the transpose is the inverse
+                    #     o_pred[:, :] = torch.bmm(o_pred.unsqueeze(1), trans.transpose(2, 1)).squeeze(dim=1)
 
-                    if trainopt.use_pca:
-                        # transform predictions with inverse pca rotation (back to world space)
-                        o_pred[:, :] = torch.bmm(o_pred.unsqueeze(1), data_trans.transpose(2, 1)).squeeze(dim=1)
+                    # if trainopt.use_pca:
+                    #     # transform predictions with inverse pca rotation (back to world space)
+                    #     o_pred[:, :] = torch.bmm(o_pred.unsqueeze(1), data_trans.transpose(2, 1)).squeeze(dim=1)
 
                     # normalize normals
-                    o_pred_len = torch.max(o_pred.new_tensor([sys.float_info.epsilon*100]), o_pred.norm(p=2, dim=1, keepdim=True))
-                    o_pred = o_pred / o_pred_len
+                    # o_pred_len = torch.max(o_pred.new_tensor([sys.float_info.epsilon*100]), o_pred.norm(p=2, dim=1, keepdim=True))
+                    # o_pred = o_pred / o_pred_len
 
                 elif o == 'max_curvature' or o == 'min_curvature':
                     o_pred = pred[:, output_pred_ind[oi]:output_pred_ind[oi]+1]
@@ -227,7 +227,7 @@ def eval_pcpnet(opt):
                     elif len(oi) == 1:
                         oi = oi[0]
                         normal_prop = shape_properties[:, output_pred_ind[oi]:output_pred_ind[oi]+6]
-                        np.savetxt(os.path.join(model_outdir, dataset.shape_names[shape_ind]+'.normals'), normal_prop.cpu().numpy())
+                        np.savetxt(os.path.join(model_outdir, dataset.shape_names[shape_ind]+'.laplacian'), normal_prop.cpu().numpy())
                         prop_saved[oi] = True
 
                     # save curvatures

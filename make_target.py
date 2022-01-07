@@ -3,6 +3,7 @@ import trimesh
 import numpy as np
 from scipy.sparse import coo_matrix, eye
 from scipy.spatial import distance
+import os
 def get_cotangent_weight(i,neighbor,neighbors,norms, KNN):
     def get_k_h(i,j):
         list1, list2 = neighbors[i], neighbors[j]
@@ -11,7 +12,14 @@ def get_cotangent_weight(i,neighbor,neighbors,norms, KNN):
         try:
             k,h = intersection
         except:
-            k,h = intersection[:2]
+            if len(intersection)>2:
+                k,h = intersection[:2]
+            elif len(intersection)== 1:
+                print("error here only 1 intersection")
+                k,h = intersection[0], intersection[0]
+            else:
+                print("error here no intersection")
+                k,h = 0,0
             # print(intersection)
             # print(i,j)
             # print('k,h', )
@@ -94,14 +102,18 @@ def save_xyz(pts, file_name):
         f.write("%s\n" % s)
 
 def create_target():
-    files = glob.glob('data/noisy/*.obj')
+    files = glob.glob('data/new_data/noisy_mesh/*.obj')
     for file in files:
+        dest_name = 'data/new_data/laplacian/' +file.split('/')[-1].split('.')[0] +'.laplacian'
+        danger = set(["gear_n3.obj", "boy01-scanned_n1.obj","gear_n2.obj", "gear_n1.obj", "boy02-scanned_n1.obj"])
+        if os.path.isfile(dest_name) or file.split("/")[-1] in danger:
+            print("skipped: ", file)
+            continue
+        
         print(file)
         mesh = trimesh.load_mesh(file)
         result = knn_cotangent_laplacian(mesh, 6)
     
-        dest_name = 'data/laplacian/' +file.split('/')[-1].split('.')[0] +'.laplacian'
         save_xyz(result, dest_name)
-        
 
 create_target()

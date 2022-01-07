@@ -231,7 +231,7 @@ class PointcloudPatchDataset(data.Dataset):
             print('getting information for shape %s' % (shape_name))
 
             # load from text file and save in more efficient numpy format
-            point_filename = os.path.join(self.root,'xyz', shape_name+'.xyz')
+            point_filename = os.path.join(self.root,'internet_xyz', shape_name+'.xyz')
             pts = np.loadtxt(point_filename).astype('float32')
             np.save(point_filename+'.npy', pts)
 
@@ -425,7 +425,7 @@ class PointcloudPatchDataset(data.Dataset):
 
     # load shape from a given shape index
     def load_shape_by_index(self, shape_ind):
-        point_filename = os.path.join(self.root,'xyz', self.shape_names[shape_ind]+'.xyz')
+        point_filename = os.path.join(self.root,'internet_xyz', self.shape_names[shape_ind]+'.xyz')
         normals_filename = os.path.join(self.root, self.shape_names[shape_ind]+'.normals') if self.include_normals else None
         laplacian_filename = os.path.join(self.root, 'laplacian',self.shape_names[shape_ind]+'.laplacian') if self.include_laplacian else None
         curv_filename = os.path.join(self.root, self.shape_names[shape_ind]+'.curv') if self.include_curvatures else None
