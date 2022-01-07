@@ -20,19 +20,19 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
 
     # naming / file handling
-    parser.add_argument('--name', type=str, default='temp', help='training run name')
+    parser.add_argument('--name', type=str, default='denoise_50-300_one', help='training run name')
     parser.add_argument('--desc', type=str, default='My training run for single-scale normal estimation.', help='description')
-    parser.add_argument('--indir', type=str, default='./data', help='input folder (point clouds)')
+    parser.add_argument('--indir', type=str, default='./data/new_data', help='input folder (point clouds)')
     parser.add_argument('--outdir', type=str, default='./models', help='output folder (trained models)')
     parser.add_argument('--logdir', type=str, default='./logs', help='training log folder')
     parser.add_argument('--trainset', type=str, default='trainingset.txt', help='training set file name')
-    parser.add_argument('--testset', type=str, default='testset.txt', help='test set file name')
+    parser.add_argument('--testset', type=str, default='valset.txt', help='test set file name')
     parser.add_argument('--saveinterval', type=int, default='10', help='save model each n epochs')
     parser.add_argument('--refine', type=str, default='', help='refine model at this path')
-    parser.add_argument('--gpu_idx', type=int, default=1, help='set < 0 to use CPU')
+    parser.add_argument('--gpu_idx', type=int, default=0, help='set < 0 to use CPU')
 
     # training parameters
-    parser.add_argument('--nepoch', type=int, default=500, help='number of epochs to train for')
+    parser.add_argument('--nepoch', type=int, default=200, help='number of epochs to train for')
     parser.add_argument('--batchSize', type=int, default=64, help='input batch size')
     parser.add_argument('--patch_radius', type=float, default=[0.05], nargs='+', help='patch radius in multiples of the shape\'s bounding box diagonal, multiple values for multi-scale.')
     parser.add_argument('--patch_center', type=str, default='point', help='center patch at...\n'

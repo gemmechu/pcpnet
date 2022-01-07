@@ -94,14 +94,15 @@ def save_xyz(pts, file_name):
         f.write("%s\n" % s)
 
 def create_target():
-    files = glob.glob('data/noisy/*.obj')
+    files = glob.glob('data/smooth/*.obj')
     for file in files:
         print(file)
         mesh = trimesh.load_mesh(file)
         result = knn_cotangent_laplacian(mesh, 6)
     
-        dest_name = 'data/laplacian/' +file.split('/')[-1].split('.')[0] +'.laplacian'
+        dest_name = 'data/laplacian_smooth/' +file.split('/')[-1].split('.')[0] +'.laplacian'
         save_xyz(result, dest_name)
+        break
         
 
 create_target()
