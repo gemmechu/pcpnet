@@ -17,9 +17,9 @@ def parse_arguments():
     # naming / file handling
     parser.add_argument('--indir', type=str, default='./data/new_data', help='input folder (point clouds)')
     parser.add_argument('--outdir', type=str, default='./results', help='output folder (estimated point cloud properties)')
-    parser.add_argument('--dataset', type=str, default='testset.txt', help='shape set file name')
+    parser.add_argument('--dataset', type=str, default='testset_temp.txt', help='shape set file name')
     parser.add_argument('--modeldir', type=str, default='./models', help='model folder')
-    parser.add_argument('--models', type=str, default='denoise_50-300', help='names of trained models, can evaluate multiple models')
+    parser.add_argument('--models', type=str, default='denoise_50-300_robust_cotan_rev', help='names of trained models, can evaluate multiple models')
     parser.add_argument('--modelpostfix', type=str, default='_model.pth', help='model file postfix')
     parser.add_argument('--parmpostfix', type=str, default='_params.pth', help='parameter file postfix')
     parser.add_argument('--gpu_idx', type=int, default=-2, help='set < 0 to use CPU')

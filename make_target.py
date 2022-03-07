@@ -1,100 +1,55 @@
-import glob
-import trimesh
 import numpy as np
-from scipy.sparse import coo_matrix, eye
+import trimesh
+import scipy.sparse as sparse
+from scipy.sparse import coo_matrix
 from scipy.spatial import distance
+import glob
 import os
-def get_cotangent_weight(i,neighbor,neighbors,norms, KNN):
-    def get_k_h(i,j):
-        list1, list2 = neighbors[i], neighbors[j]
-        #if there is morethan 2 intersection choose the first 2 points
-        intersection = list(set(list1).intersection(list2))
-        try:
-            k,h = intersection
-        except:
-            if len(intersection)>2:
-                k,h = intersection[:2]
-            elif len(intersection)== 1:
-                print("error here only 1 intersection")
-                k,h = intersection[0], intersection[0]
+import robust_laplacian
+
+def knn_cotan(mesh, k):
+    def get_weight(neighbour,cotan_weight, i):
+        indices = set(cotan_weight.getrow(i).indices)
+        values = np.array(cotan_weight.getrow(i).todense())
+        result,result_abs = [],[]
+        for col in neighbour:
+            if col in indices:
+                result.append(values[0][col])
+                result_abs.append(-1* (values[0][col]))
             else:
-                print("error here no intersection")
-                k,h = 0,0
-            # print(intersection)
-            # print(i,j)
-            # print('k,h', )
-
-        return k,h
-    def get_distance(i,j,k,h):
-        j_idx = neighbors[i].index(j)
-        lij = norms[i][j_idx]
-
-        k_idx = neighbors[j].index(k)
-        ljk = norms[j][k_idx]
-
-        i_idx = neighbors[k].index(i)
-        lki = norms[k][i_idx]
-
-        h_idx = neighbors[j].index(h)
-        ljh = norms[j][h_idx]
-
-        i_idx = neighbors[h].index(i)
-        lhi = norms[h][i_idx]
-
-        return lij, ljk, lki, ljh, lhi 
-
-    result = []
-    for j in KNN:
-        #if j in neighbor find Cotangent weight else assign 0
-        wij = 0
-        if j in neighbor:
-            
-            k,h  = get_k_h(i,j)
-            lij, ljk, lki, ljh, lhi = get_distance(i,j,k,h)
-
-            s_ijk = (lij + ljk + lki)/2
-            A_ijk = 8 *  np.sqrt(s_ijk * ( s_ijk - lij) * ( s_ijk- ljk) * ( s_ijk - lki))
-
-            s_ijh = (lij + ljh + lhi)/2
-            A_ijh = 8 *  np.sqrt(s_ijh * ( s_ijh - lij) * ( s_ijh- ljh) * ( s_ijh - lhi))
-
-            
-            wij = ((-lij**2 + ljk ** 2 + lki**2)/  A_ijk)  + ((-lij**2 + ljh ** 2 + lhi**2)/  A_ijh)
-        
-       
-        result.append(wij)
-        
-    return result
-
-def knn_cotangent_laplacian(mesh, k):
-    neighbors = mesh.vertex_neighbors
-    
+                result.append(0.0)
+                result_abs.append(0.0)
+        return result,result_abs
     vertices = mesh.vertices.view(np.ndarray)
-
-    ones = np.ones(3)
-    norms = [np.sqrt(np.dot((vertices[i] - vertices[n]) ** 2, ones))
-                for i, n in enumerate(neighbors)]
+    faces = mesh.faces.view(np.ndarray)
+    L, M = robust_laplacian.mesh_laplacian(vertices, faces, mollify_factor=0)
+    cotan_weight = L.tocsr()
     D = distance.squareform(distance.pdist(vertices))
     closest = np.argsort(D, axis=1)
     closest = closest[:, 1:k+1]
 
-
-
-    # norms = [i / i.sum() for i in norms]
     data = []
-
-    for i, KNN in enumerate(closest):
-        neighbor = neighbors[i]
-        weight = get_cotangent_weight(i,neighbor, neighbors,norms, KNN)
+    data_abs = []
+    for i, neighbour in enumerate(closest):
+        weight, weight_abs = get_weight(neighbour, cotan_weight, i)
+        # weight.extend([0.0]*(k-len(weight)))
         data.append(weight)
-        # create the sparse matrix
+        data_abs.append(weight_abs)
     
-
-
-    data = [i / np.array(i).sum() if np.array(i).sum()>0 else i for i in data]
     
-    return data
-
+    # col = np.concatenate(closest)
+    # row = np.concatenate([[i] * len(n)
+                        #   for i, n in enumerate(closest)])
+    
+   
+    # # data = np.concatenate([i / np.array(i).sum() if np.array(i).sum()>0 else i for i in data])
+    # data = np.concatenate([i for i in data])
+    
+    
+    
+    # matrix = coo_matrix((data, (row,col)),
+    #                     shape=[len(vertices)] * 2)
+    return data,data_abs
 def save_xyz(pts, file_name):
     # print(pts)
     s = trimesh.util.array_to_string(pts)
@@ -102,18 +57,24 @@ def save_xyz(pts, file_name):
         f.write("%s\n" % s)
 
 def create_target():
-    files = glob.glob('data/new_data/noisy_mesh/*.obj')
+    files = glob.glob('data/new_data/laplacian/*.laplacian')
     for file in files:
-        dest_name = 'data/new_data/laplacian/' +file.split('/')[-1].split('.')[0] +'.laplacian'
-        danger = set(["gear_n3.obj", "boy01-scanned_n1.obj","gear_n2.obj", "gear_n1.obj", "boy02-scanned_n1.obj"])
-        if os.path.isfile(dest_name) or file.split("/")[-1] in danger:
-            print("skipped: ", file)
-            continue
-        
-        print(file)
-        mesh = trimesh.load_mesh(file)
-        result = knn_cotangent_laplacian(mesh, 6)
-    
-        save_xyz(result, dest_name)
+        name = file.split('/')[-1].split('.')[0]
+        try:
+            print(name)
+            dest_name = 'data/new_data/cotan_laplacian_mollify_0/' +name +'.laplacian'
+            dest_name_abs = 'data/new_data/cotan_laplacian_mollify_0_rev/' +name +'.laplacian'
+            noisy_path = 'data/new_data/noisy_mesh/' +name +'.obj'
+            danger = set(["gear_n3.obj", "boy01-scanned_n1.obj","gear_n2.obj", "gear_n1.obj", "boy02-scanned_n1.obj","turbine-Lp_n2.obj", "turbine-Lp_n3"])
+            if os.path.isfile(dest_name) or name in danger:
+                print("skipped: ", dest_name)
+                continue
+            mesh = trimesh.load_mesh(noisy_path)
+            result, result_abs = knn_cotan(mesh, 6)
 
+            save_xyz(result, dest_name)
+            save_xyz(result_abs, dest_name_abs)
+        except:
+            print("ERROR: ", name)
+        # break
 create_target()

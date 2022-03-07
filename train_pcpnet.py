@@ -15,24 +15,24 @@ from tensorboardX import SummaryWriter # https://github.com/lanpa/tensorboard-py
 import utils
 from dataset import PointcloudPatchDataset, RandomPointcloudPatchSampler, SequentialShapeRandomPointcloudPatchSampler
 from pcpnet import PCPNet, MSPCPNet
-
+from chamferdist import ChamferDistance
 def parse_arguments():
     parser = argparse.ArgumentParser()
 
     # naming / file handling
-    parser.add_argument('--name', type=str, default='denoise_50-300_one', help='training run name')
+    parser.add_argument('--name', type=str, default='denoise_50-300_robust_cotan_rev', help='training run name')
     parser.add_argument('--desc', type=str, default='My training run for single-scale normal estimation.', help='description')
     parser.add_argument('--indir', type=str, default='./data/new_data', help='input folder (point clouds)')
     parser.add_argument('--outdir', type=str, default='./models', help='output folder (trained models)')
     parser.add_argument('--logdir', type=str, default='./logs', help='training log folder')
-    parser.add_argument('--trainset', type=str, default='trainingset.txt', help='training set file name')
-    parser.add_argument('--testset', type=str, default='valset.txt', help='test set file name')
+    parser.add_argument('--trainset', type=str, default='trainingset_all.txt', help='training set file name')
+    parser.add_argument('--testset', type=str, default='valset_all.txt', help='test set file name')
     parser.add_argument('--saveinterval', type=int, default='10', help='save model each n epochs')
     parser.add_argument('--refine', type=str, default='', help='refine model at this path')
     parser.add_argument('--gpu_idx', type=int, default=0, help='set < 0 to use CPU')
 
     # training parameters
-    parser.add_argument('--nepoch', type=int, default=200, help='number of epochs to train for')
+    parser.add_argument('--nepoch', type=int, default=100, help='number of epochs to train for')
     parser.add_argument('--batchSize', type=int, default=64, help='input batch size')
     parser.add_argument('--patch_radius', type=float, default=[0.05], nargs='+', help='patch radius in multiples of the shape\'s bounding box diagonal, multiple values for multi-scale.')
     parser.add_argument('--patch_center', type=str, default='point', help='center patch at...\n'
@@ -358,11 +358,13 @@ def train_pcpnet(opt):
 def compute_loss(pred, target, outputs, output_pred_ind, output_target_ind, output_loss_weight, patch_rot, normal_loss):
 
     loss = 0
+    # chamfer_loss = ChamferDistance()
     loss_MSE = torch.nn.MSELoss()
     for oi, o in enumerate(outputs):
         if o == 'laplacian':
-            o_pred = pred[:, output_pred_ind[oi]:output_pred_ind[oi]+5]
-            o_target = target[output_target_ind[oi]]
+            # o_pred = pred[:, output_pred_ind[oi]:output_pred_ind[oi]+5]
+            # o_target = target[output_target_ind[oi]]
+            pred = pred.float().unsqueeze(0)
             loss += loss_MSE(pred,target)
         elif o == 'unoriented_normals' or o == 'oriented_normals':
             o_pred = pred[:, output_pred_ind[oi]:output_pred_ind[oi]+3]
